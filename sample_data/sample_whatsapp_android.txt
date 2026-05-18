@@ -1,0 +1,20 @@
+05/20/2024, 10:15 - Alice Johnson: The employment agreement needs revision. Are we keeping the non-compete clause?
+05/20/2024, 10:32 - Bob Smith: Yes, we agreed to keep it. It's 12 months from termination date.
+05/20/2024, 10:34 - Carol Davis: What about the severance package terms? I need to confirm with HR.
+05/20/2024, 10:40 - Bob Smith: Severance is 6 months of salary plus benefits continuation for 30 days after termination.
+05/20/2024, 10:44 - Alice Johnson: That aligns with what we discussed. Are there any vesting schedules we need to include?
+05/20/2024, 11:04 - Carol Davis: Stock options vest over 4 years with a 1-year cliff. Standard startup terms.
+05/20/2024, 11:07 - Bob Smith: I'll incorporate these into the final draft. What about the indemnification clause?
+05/20/2024, 11:13 - Alice Johnson: The employee should be indemnified for actions within the scope of their role.
+05/20/2024, 11:25 - Carol Davis: We also need to include the standard representations and warranties section.
+05/20/2024, 11:45 - Bob Smith: Will do. Let me also confirm the governing law - should this be Delaware or California?
+05/20/2024, 11:50 - Alice Johnson: Delaware is our standard for employee agreements. We've had good outcomes with Delaware courts.
+05/20/2024, 12:01 - Carol Davis: Updated the vendor contract for review. Main changes are in the service level agreements section.
+05/20/2024, 12:04 - Bob Smith: What are the uptime requirements?
+05/20/2024, 12:08 - Carol Davis: 99.5% monthly uptime guarantee with 5% service credit for each 0.1% below target.
+05/20/2024, 12:25 - Alice Johnson: That's a strong SLA. What about response times for support?
+05/20/2024, 12:26 - Carol Davis: Critical issues: 1 hour response, High: 4 hours, Medium: 1 day, Low: 2 days
+05/20/2024, 12:46 - Bob Smith: Good. Are there any penalties if they don't meet these SLAs?
+05/20/2024, 12:55 - Carol Davis: Service credits accumulate and can result in contract termination if they fall below 98% for 3 months.
+05/20/2024, 13:11 - Alice Johnson: Excellent. This protects us well. When can we send it to them for signature?
+05/20/2024, 13:23 - Bob Smith: I'll prepare the signature version by end of week.

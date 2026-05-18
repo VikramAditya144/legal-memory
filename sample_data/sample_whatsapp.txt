@@ -1,0 +1,23 @@
+[05/15/2024, 09:30:45] Alice Johnson: Hi team, I'm reviewing the vendor agreement. I need to check the arbitration clause.
+[05/15/2024, 09:31:22] Bob Smith: The arbitration clause is on page 3. We modified it to require mandatory mediation first.
+[05/15/2024, 09:32:15] Alice Johnson: Thanks. I also noticed the payment terms specify net-30 with a 2% discount for net-10.
+[05/15/2024, 09:33:44] Bob Smith: That's correct. We negotiated those terms carefully with their finance team.
+[05/15/2024, 09:34:18] Carol Davis: Is there a termination without cause clause? What's the notice period?
+[05/15/2024, 09:35:22] Bob Smith: Yes, it requires 90 days notice for termination without cause. 30 days if either party is in breach.
+[05/15/2024, 09:36:45] Alice Johnson: And what about the IP ownership clause? I want to make sure we retain all intellectual property.
+[05/15/2024, 09:37:30] Carol Davis: The IP clause states that any work product created during the engagement belongs to us. Background IP remains with the vendor.
+[05/15/2024, 09:38:15] Bob Smith: Exactly. We also have a non-compete clause that extends for 12 months after termination in the employment agreements.
+[05/15/2024, 09:39:00] Alice Johnson: Good. What about the confidentiality period for the NDA we signed?
+[05/15/2024, 09:39:45] Carol Davis: The NDA confidentiality obligations survive termination for 3 years. We extended it from the standard 2 years.
+[05/15/2024, 09:40:30] Bob Smith: Right. And don't forget the insurance requirements - we need to maintain at least $2M in general liability coverage.
+[05/15/2024, 09:41:15] Alice Johnson: That's noted. Any other key terms I should review before we sign?
+[05/15/2024, 09:42:00] Carol Davis: The severance package for key employees includes 6 months salary plus benefits continuation. We added that during last round of negotiations.
+[05/15/2024, 09:43:22] Bob Smith: Also, the force majeure clause now includes pandemic-related events as we learned from last year's issues.
+[05/15/2024, 09:44:00] Alice Johnson: Perfect. I'll document these and prepare the final signature package.
+[05/16/2024, 14:20:15] Bob Smith: Alice, the client requested changes to the dispute resolution clause. They want arbitration in New York instead of Delaware.
+[05/16/2024, 14:21:00] Alice Johnson: That's a significant change. We should review the implications for venue and applicable law.
+[05/16/2024, 14:22:30] Carol Davis: I agree. Let me check our past disputes and see if New York jurisdiction would have made a difference.
+[05/16/2024, 14:23:45] Bob Smith: Good idea. Also, they're asking about late payment penalties. Should we impose interest on overdue invoices?
+[05/16/2024, 14:25:00] Alice Johnson: Standard practice is 1.5% monthly interest on overdue amounts, with a minimum of $100. Let me check what we did with similar contracts.
+[05/16/2024, 14:26:15] Carol Davis: I found three similar contracts. Two had 1.5% monthly, one had a flat 5% annual rate.
+[05/16/2024, 14:27:30] Bob Smith: Let's go with the 1.5% monthly approach as it's more standard and recovers costs better.

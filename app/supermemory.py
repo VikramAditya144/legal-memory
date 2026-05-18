@@ -1,13 +1,12 @@
 """
-Supermemory integration layer.
+Supermemory — primary storage and retrieval layer.
 
-Mirrors chunks into Supermemory alongside Qdrant so lawyers get two
-complementary retrieval engines: Qdrant (local vector similarity) and
-Supermemory (cloud semantic search with reranking + query rewriting).
+Replaces Qdrant as the sole vector store. Handles ingest, search, and
+collection stats via the Supermemory cloud API.
 
-Container tag convention:
-  - PDFs       → "legal-pdf"
-  - WhatsApp   → "legal-whatsapp"
+Container tags:
+  legal-pdf        → PDF documents
+  legal-whatsapp   → WhatsApp chat exports
 """
 
 from __future__ import annotations
@@ -37,15 +36,17 @@ def is_available() -> bool:
 
 def add_chunks(chunks: list[dict]) -> int:
     """
-    Push a list of ingested chunks to Supermemory.
+    Push ingested chunks to Supermemory.
 
     Each chunk must have "text" and "metadata" keys (same shape as
     produced by chunk_pdf / chunk_messages).  Returns count stored.
-    Falls back silently if Supermemory is unavailable.
+    Raises if Supermemory is unavailable.
     """
     client = _get_client()
     if client is None:
-        return 0
+        raise RuntimeError(
+            "Supermemory is not configured. Set SUPERMEMORY_API_KEY in your environment."
+        )
 
     stored = 0
     for chunk in chunks:
@@ -53,7 +54,6 @@ def add_chunks(chunks: list[dict]) -> int:
         source_type = meta.get("source_type", "pdf")
         container = _CONTAINER_WHATSAPP if source_type == "whatsapp" else _CONTAINER_PDF
 
-        # Build flat metadata (Supermemory requires str/float/bool values)
         sm_meta: dict = {
             "source_name": str(meta.get("source_name", "")),
             "source_type": source_type,
@@ -65,25 +65,21 @@ def add_chunks(chunks: list[dict]) -> int:
         if meta.get("senders"):
             sm_meta["senders"] = str(meta["senders"])
 
-        try:
-            client.documents.add(
-                content=chunk["text"],
-                container_tag=container,
-                metadata=sm_meta,
-                task_type="superrag",
-            )
-            stored += 1
-        except Exception:
-            pass
+        client.documents.add(
+            content=chunk["text"],
+            container_tag=container,
+            metadata=sm_meta,
+            task_type="superrag",
+        )
+        stored += 1
 
     return stored
 
 
 def search(query: str, top_k: int = 5) -> list[dict]:
     """
-    Search Supermemory and return results in the same shape as store.search().
-
-    Falls back to [] if Supermemory is unavailable.
+    Search Supermemory and return results in a normalised shape.
+    Returns [] if Supermemory is unavailable.
     """
     client = _get_client()
     if client is None:
@@ -103,7 +99,6 @@ def search(query: str, top_k: int = 5) -> list[dict]:
 
     results = []
     for doc in getattr(response, "results", []):
-        # Each result may have multiple chunks; use the top chunk
         chunks = getattr(doc, "chunks", [])
         text = chunks[0].content if chunks else getattr(doc, "content", "")
         score = getattr(chunks[0], "score", 0.0) if chunks else 0.0
@@ -120,3 +115,52 @@ def search(query: str, top_k: int = 5) -> list[dict]:
         })
 
     return results
+
+
+def collection_stats() -> dict:
+    """
+    Return stats derived from Supermemory document listings.
+    Falls back to zeroed stats if the API is unavailable.
+    """
+    client = _get_client()
+    if client is None:
+        return {"total_chunks": 0, "pdf_sources": [], "whatsapp_sources": [], "supermemory_available": False}
+
+    pdf_sources: set[str] = set()
+    whatsapp_sources: set[str] = set()
+    total = 0
+
+    for container, bucket in (
+        (_CONTAINER_PDF, pdf_sources),
+        (_CONTAINER_WHATSAPP, whatsapp_sources),
+    ):
+        try:
+            page = 1
+            while True:
+                resp = client.documents.list(
+                    container_tags=[container],
+                    limit=100,
+                    page=page,
+                    include_content=False,
+                )
+                docs = getattr(resp, "documents", []) or []
+                if not docs:
+                    break
+                for doc in docs:
+                    total += 1
+                    meta = getattr(doc, "metadata", {}) or {}
+                    name = meta.get("source_name", "")
+                    if name:
+                        bucket.add(name)
+                if len(docs) < 100:
+                    break
+                page += 1
+        except Exception:
+            break
+
+    return {
+        "total_chunks": total,
+        "pdf_sources": sorted(pdf_sources),
+        "whatsapp_sources": sorted(whatsapp_sources),
+        "supermemory_available": True,
+    }

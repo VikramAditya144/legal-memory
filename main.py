@@ -1,20 +1,17 @@
 """
-AI Legal Memory — Streamlit demo app.
+AI Legal Memory — Streamlit demo app (Supermemory-only).
 
 Run with:  streamlit run main.py
 """
 
-import os
 import tempfile
 from pathlib import Path
 
-# Load .env before anything else
 from dotenv import load_dotenv
 load_dotenv()
 
 import streamlit as st
 
-# ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Legal Memory",
     page_icon="⚖️",
@@ -22,61 +19,41 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Lazy imports (fail gracefully with a helpful message) ─────────────────────
 try:
-    from app.embeddings import embed_texts
     from app.ingest import ingest_pdf, ingest_whatsapp
-    from app.store import collection_stats, get_client as get_qdrant, search as qdrant_search
-    from app.summarize import summarize_results_batch
     import app.supermemory as supermemory
+    from app.summarize import summarize_results_batch
 except ImportError as e:
     st.error(f"Missing dependency: {e}. Run `pip install -r requirements.txt`")
     st.stop()
 
-# ── Session state defaults ────────────────────────────────────────────────────
-if "last_results" not in st.session_state:
-    st.session_state.last_results = []
-if "last_sm_results" not in st.session_state:
-    st.session_state.last_sm_results = []
-if "ingest_log" not in st.session_state:
-    st.session_state.ingest_log = []
-if "last_query" not in st.session_state:
-    st.session_state.last_query = ""
-
-# ── Qdrant connection ─────────────────────────────────────────────────────────
-@st.cache_resource(show_spinner=False)
-def qdrant():
-    return get_qdrant()
-
-def check_qdrant() -> bool:
-    try:
-        qdrant().get_collections()
-        return True
-    except Exception:
-        return False
+# ── Session state ─────────────────────────────────────────────────────────────
+for key, default in [
+    ("last_results", []),
+    ("ingest_log", []),
+    ("last_query", ""),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("⚖️ Legal Memory")
     st.caption("AI-powered retrieval from your firm's documents")
 
-    # Connection status
-    col_q, col_sm = st.columns(2)
-    with col_q:
-        if check_qdrant():
-            st.success("Qdrant ✅")
-        else:
-            st.error("Qdrant ✗")
-    with col_sm:
-        if supermemory.is_available():
-            st.success("Supermemory ✅")
-        else:
-            st.warning("Supermemory –")
+    if supermemory.is_available():
+        st.success("Supermemory connected ✅")
+    else:
+        st.error("Supermemory not configured — add SUPERMEMORY_API_KEY to .env")
 
     st.divider()
 
-    # ── Stats ──
-    stats = collection_stats(qdrant())
+    # Stats
+    @st.cache_data(ttl=30, show_spinner=False)
+    def load_stats():
+        return supermemory.collection_stats()
+
+    stats = load_stats()
     col1, col2 = st.columns(2)
     col1.metric("Chunks indexed", stats["total_chunks"])
     col2.metric("Documents", len(stats["pdf_sources"]) + len(stats["whatsapp_sources"]))
@@ -93,7 +70,7 @@ with st.sidebar:
 
     st.divider()
 
-    # ── Upload PDFs ──
+    # Upload PDFs
     st.subheader("Upload Documents")
     pdf_files = st.file_uploader(
         "PDF files",
@@ -118,7 +95,7 @@ with st.sidebar:
                     entry = f"✅ {uploaded.name} — {result['chunks']} chunks"
                     st.session_state.ingest_log.append(entry)
                     st.success(entry)
-                    st.cache_resource.clear()
+                    st.cache_data.clear()
                 except Exception as e:
                     st.error(f"Failed: {uploaded.name} — {e}")
                 finally:
@@ -126,7 +103,7 @@ with st.sidebar:
 
     st.divider()
 
-    # ── Upload WhatsApp ──
+    # Upload WhatsApp
     st.subheader("WhatsApp Exports")
     st.caption("Export chat → 'Without media' → share the .txt file")
     wa_files = st.file_uploader(
@@ -154,13 +131,12 @@ with st.sidebar:
                     )
                     st.session_state.ingest_log.append(entry)
                     st.success(entry)
-                    st.cache_resource.clear()
+                    st.cache_data.clear()
                 except Exception as e:
                     st.error(f"Failed: {uploaded.name} — {e}")
                 finally:
                     Path(tmp_path).unlink(missing_ok=True)
 
-    # ── Ingest log ──
     if st.session_state.ingest_log:
         with st.expander("Ingest log"):
             for entry in reversed(st.session_state.ingest_log):
@@ -187,10 +163,8 @@ col_search, col_clear = st.columns([1, 5])
 search_btn = col_search.button("Search", type="primary")
 if col_clear.button("Clear"):
     st.session_state.last_results = []
-    st.session_state.last_sm_results = []
     st.rerun()
 
-# Example queries
 with st.expander("Example queries", expanded=stats["total_chunks"] == 0):
     for eq in example_queries:
         if st.button(eq, key=f"ex_{eq}"):
@@ -198,42 +172,28 @@ with st.expander("Example queries", expanded=stats["total_chunks"] == 0):
             search_btn = True
 
 if search_btn and query.strip():
-    if stats["total_chunks"] == 0:
+    if not supermemory.is_available():
+        st.error("Supermemory is not configured. Add SUPERMEMORY_API_KEY to .env")
+    elif stats["total_chunks"] == 0:
         st.warning("No documents indexed yet. Upload PDFs or WhatsApp exports in the sidebar.")
-    elif not check_qdrant():
-        st.error("Qdrant is not running. Start it with: `docker compose up -d`")
     else:
         with st.spinner("Searching…"):
             try:
-                # Qdrant vector search
-                vec = embed_texts([query.strip()])[0]
-                results = qdrant_search(vec, qdrant(), top_k=5)
+                results = supermemory.search(query.strip(), top_k=5)
                 summaries = summarize_results_batch(query.strip(), results)
                 for r, s in zip(results, summaries):
                     r["summary"] = s
                 st.session_state.last_results = results
                 st.session_state.last_query = query.strip()
-
-                # Supermemory search (parallel, non-blocking)
-                if supermemory.is_available():
-                    sm_results = supermemory.search(query.strip(), top_k=5)
-                    sm_summaries = summarize_results_batch(query.strip(), sm_results)
-                    for r, s in zip(sm_results, sm_summaries):
-                        r["summary"] = s
-                    st.session_state.last_sm_results = sm_results
-                else:
-                    st.session_state.last_sm_results = []
-
             except Exception as e:
                 st.error(f"Search failed: {e}")
 
 # ── Results ───────────────────────────────────────────────────────────────────
-def render_results(results: list[dict], engine_label: str):
-    if not results:
-        st.info(f"No results from {engine_label}.")
-        return
+if st.session_state.last_results:
+    st.divider()
+    st.subheader(f"Top {len(st.session_state.last_results)} results · Supermemory")
 
-    for i, r in enumerate(results, start=1):
+    for r in st.session_state.last_results:
         source_icon = "💬" if r["source_type"] == "whatsapp" else "📄"
         score_pct = int(r["score"] * 100)
 
@@ -269,27 +229,6 @@ def render_results(results: list[dict], engine_label: str):
                 st.text(r["text"])
 
             st.divider()
-
-
-has_qdrant = bool(st.session_state.last_results)
-has_sm = bool(st.session_state.last_sm_results)
-
-if has_qdrant or has_sm:
-    st.divider()
-
-    if has_sm:
-        tab_qdrant, tab_sm = st.tabs(["Qdrant · Vector search", "Supermemory · Semantic search"])
-        with tab_qdrant:
-            st.caption("Cosine similarity on local fastembed multilingual embeddings")
-            render_results(st.session_state.last_results, "Qdrant")
-        with tab_sm:
-            st.caption("Cloud semantic search with query rewriting and reranking")
-            render_results(st.session_state.last_sm_results, "Supermemory")
-    else:
-        st.subheader(f"Top {len(st.session_state.last_results)} results")
-        if not supermemory.is_available():
-            st.caption("Add `SUPERMEMORY_API_KEY` to `.env` to also search via Supermemory")
-        render_results(st.session_state.last_results, "Qdrant")
 
 elif not search_btn:
     if stats["total_chunks"] == 0:

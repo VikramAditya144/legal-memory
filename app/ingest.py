@@ -1,28 +1,26 @@
 """
 Document ingestion pipeline.
 
-Orchestrates: parse → chunk → embed → store.
+Orchestrates: parse → chunk → store in Supermemory.
 Supports WhatsApp .txt exports and PDF files.
 """
 
 from pathlib import Path
 
-from app.embeddings import embed_texts
 from app.parsers.pdf import chunk_pdf
 from app.parsers.whatsapp import chunk_messages, parse_whatsapp_export
-from app.store import get_client as get_qdrant, upsert_chunks
 import app.supermemory as supermemory
 
 
 def ingest_whatsapp(path: str | Path, progress_cb=None) -> dict:
     """
-    Ingest a WhatsApp .txt export.
+    Ingest a WhatsApp .txt export into Supermemory.
 
     progress_cb(step: str, pct: float) is called at key stages if provided.
     Returns {"chunks": int, "messages": int, "source": str}.
     """
     path = Path(path)
-    source_name = path.stem  # e.g. "WhatsApp Chat with Acme Corp"
+    source_name = path.stem
 
     if progress_cb:
         progress_cb("Parsing WhatsApp export…", 0.1)
@@ -32,27 +30,13 @@ def ingest_whatsapp(path: str | Path, progress_cb=None) -> dict:
         return {"chunks": 0, "messages": 0, "source": source_name}
 
     chunks = chunk_messages(messages, window=5, overlap=1)
-
-    # Tag source name into each chunk
     for c in chunks:
         c["metadata"]["source_name"] = source_name
 
     if progress_cb:
-        progress_cb(f"Embedding {len(chunks)} chunks…", 0.4)
+        progress_cb(f"Uploading {len(chunks)} chunks to Supermemory…", 0.4)
 
-    texts = [c["text"] for c in chunks]
-    embeddings = embed_texts(texts)
-
-    if progress_cb:
-        progress_cb("Storing in Qdrant…", 0.75)
-
-    qdrant_client = get_qdrant()
-    stored = upsert_chunks(chunks, embeddings, qdrant_client)
-
-    if progress_cb:
-        progress_cb("Mirroring to Supermemory…", 0.9)
-
-    supermemory.add_chunks(chunks)
+    stored = supermemory.add_chunks(chunks)
 
     if progress_cb:
         progress_cb("Done.", 1.0)
@@ -62,7 +46,7 @@ def ingest_whatsapp(path: str | Path, progress_cb=None) -> dict:
 
 def ingest_pdf(path: str | Path, progress_cb=None) -> dict:
     """
-    Ingest a PDF file.
+    Ingest a PDF file into Supermemory.
 
     Returns {"chunks": int, "pages": int, "source": str}.
     """
@@ -75,28 +59,13 @@ def ingest_pdf(path: str | Path, progress_cb=None) -> dict:
     if not chunks:
         return {"chunks": 0, "pages": 0, "source": path.name}
 
-    pages = max(
-        (max(int(p) for p in str(c["metadata"].get("pages", "0")).split(", ") if p.isdigit())
-         for c in chunks),
-        default=0,
-    )
+    all_page_nums = [p for c in chunks for p in c["metadata"].get("pages", [])]
+    pages = max(all_page_nums) if all_page_nums else 0
 
     if progress_cb:
-        progress_cb(f"Embedding {len(chunks)} chunks…", 0.4)
+        progress_cb(f"Uploading {len(chunks)} chunks to Supermemory…", 0.4)
 
-    texts = [c["text"] for c in chunks]
-    embeddings = embed_texts(texts)
-
-    if progress_cb:
-        progress_cb("Storing in Qdrant…", 0.75)
-
-    qdrant_client = get_qdrant()
-    stored = upsert_chunks(chunks, embeddings, qdrant_client)
-
-    if progress_cb:
-        progress_cb("Mirroring to Supermemory…", 0.9)
-
-    supermemory.add_chunks(chunks)
+    stored = supermemory.add_chunks(chunks)
 
     if progress_cb:
         progress_cb("Done.", 1.0)

@@ -1,5 +1,24 @@
+# Secrets
 .env
-data/
+.env.local
+.streamlit/secrets.toml
+
+# Python
 __pycache__/
 *.pyc
-.streamlit/secrets.toml
+*.pyo
+.venv/
+data/
+*.egg-info/
+dist/
+build/
+
+# Next.js / Node
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/out/
+frontend/.vercel/
+
+# macOS
+.DS_Store
