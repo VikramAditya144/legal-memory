@@ -25,9 +25,10 @@ st.set_page_config(
 
 # ── Lazy imports (fail gracefully with a helpful message) ─────────────────────
 try:
-    from app.embeddings import embed_texts, get_client as get_openai
+    from app.embeddings import embed_texts
     from app.ingest import ingest_pdf, ingest_whatsapp
     from app.store import collection_stats, get_client as get_qdrant, search
+    from app.summarize import summarize_results_batch
 except ImportError as e:
     st.error(f"Missing dependency: {e}. Run `pip install -r requirements.txt`")
     st.stop()
@@ -37,15 +38,13 @@ if "last_results" not in st.session_state:
     st.session_state.last_results = []
 if "ingest_log" not in st.session_state:
     st.session_state.ingest_log = []
+if "last_query" not in st.session_state:
+    st.session_state.last_query = ""
 
 # ── Qdrant connection ─────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def qdrant():
     return get_qdrant()
-
-@st.cache_resource(show_spinner=False)
-def openai_client():
-    return get_openai()
 
 def check_qdrant() -> bool:
     try:
@@ -196,10 +195,14 @@ if search_btn and query.strip():
     else:
         with st.spinner("Searching…"):
             try:
-                oai = openai_client()
-                vec = embed_texts([query.strip()], client=oai)[0]
+                vec = embed_texts([query.strip()])[0]
                 results = search(vec, qdrant(), top_k=5)
+                # Claude summaries (non-blocking — falls back gracefully if key missing)
+                summaries = summarize_results_batch(query.strip(), results)
+                for r, s in zip(results, summaries):
+                    r["summary"] = s
                 st.session_state.last_results = results
+                st.session_state.last_query = query.strip()
             except Exception as e:
                 st.error(f"Search failed: {e}")
 
@@ -227,11 +230,19 @@ if st.session_state.last_results:
                 color = "green" if score_pct >= 70 else "orange" if score_pct >= 50 else "red"
                 st.markdown(f":{color}[{score_pct}% match]")
 
-            # Show excerpt — first 400 chars, then expandable full text
-            excerpt = r["text"][:400].replace("\n", " ").strip()
-            if len(r["text"]) > 400:
-                excerpt += "…"
-            st.markdown(f"> {excerpt}")
+            # Claude summary (if available) — otherwise raw excerpt
+            summary = r.get("summary", "")
+            if summary:
+                st.markdown(f"**{summary}**")
+                excerpt = r["text"][:300].replace("\n", " ").strip()
+                if len(r["text"]) > 300:
+                    excerpt += "…"
+                st.caption(excerpt)
+            else:
+                excerpt = r["text"][:400].replace("\n", " ").strip()
+                if len(r["text"]) > 400:
+                    excerpt += "…"
+                st.markdown(f"> {excerpt}")
 
             with st.expander("Full text"):
                 st.text(r["text"])

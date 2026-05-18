@@ -15,12 +15,18 @@ from qdrant_client.models import (
     VectorParams,
 )
 
-from app.embeddings import EMBEDDING_DIMENSIONS
+from app.embeddings import EMBEDDING_DIMENSIONS  # 768 — multilingual-mpnet
 
 _DEFAULT_COLLECTION = "legal_memory"
 
 
 def get_client() -> QdrantClient:
+    url = os.getenv("QDRANT_URL", "")
+    api_key = os.getenv("QDRANT_API_KEY", "")
+    if url:
+        # Qdrant Cloud (or any HTTPS endpoint)
+        return QdrantClient(url=url, api_key=api_key or None, timeout=30)
+    # Local Docker fallback
     host = os.getenv("QDRANT_HOST", "localhost")
     port = int(os.getenv("QDRANT_PORT", "6333"))
     return QdrantClient(host=host, port=port, timeout=30)
@@ -95,16 +101,16 @@ def search(
             must=[FieldCondition(key="source_name", match=MatchValue(value=source_filter))]
         )
 
-    hits = client.search(
+    response = client.query_points(
         collection_name=collection,
-        query_vector=query_vector,
+        query=query_vector,
         limit=top_k,
         query_filter=query_filter,
         with_payload=True,
     )
 
     results = []
-    for hit in hits:
+    for hit in response.points:
         results.append({
             "score": round(hit.score, 3),
             "text": hit.payload.get("text", ""),

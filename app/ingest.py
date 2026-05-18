@@ -7,7 +7,7 @@ Supports WhatsApp .txt exports and PDF files.
 
 from pathlib import Path
 
-from app.embeddings import embed_texts, get_client as get_openai
+from app.embeddings import embed_texts
 from app.parsers.pdf import chunk_pdf
 from app.parsers.whatsapp import chunk_messages, parse_whatsapp_export
 from app.store import get_client as get_qdrant, upsert_chunks
@@ -40,8 +40,7 @@ def ingest_whatsapp(path: str | Path, progress_cb=None) -> dict:
         progress_cb(f"Embedding {len(chunks)} chunks…", 0.4)
 
     texts = [c["text"] for c in chunks]
-    openai_client = get_openai()
-    embeddings = embed_texts(texts, client=openai_client)
+    embeddings = embed_texts(texts)
 
     if progress_cb:
         progress_cb("Storing in Qdrant…", 0.8)
@@ -80,8 +79,7 @@ def ingest_pdf(path: str | Path, progress_cb=None) -> dict:
         progress_cb(f"Embedding {len(chunks)} chunks…", 0.4)
 
     texts = [c["text"] for c in chunks]
-    openai_client = get_openai()
-    embeddings = embed_texts(texts, client=openai_client)
+    embeddings = embed_texts(texts)
 
     if progress_cb:
         progress_cb("Storing in Qdrant…", 0.8)
