@@ -50,7 +50,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        result = ingest_pdf(tmp_path)
+        result = ingest_pdf(tmp_path, source_name=file.filename)
     except Exception as e:
         raise HTTPException(500, str(e))
     finally:
@@ -77,7 +77,7 @@ async def upload_whatsapp(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        result = ingest_whatsapp(tmp_path)
+        result = ingest_whatsapp(tmp_path, source_name=file.filename)
     except Exception as e:
         raise HTTPException(500, str(e))
     finally:
