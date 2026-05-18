@@ -11,6 +11,7 @@ from app.embeddings import embed_texts
 from app.parsers.pdf import chunk_pdf
 from app.parsers.whatsapp import chunk_messages, parse_whatsapp_export
 from app.store import get_client as get_qdrant, upsert_chunks
+import app.supermemory as supermemory
 
 
 def ingest_whatsapp(path: str | Path, progress_cb=None) -> dict:
@@ -43,10 +44,15 @@ def ingest_whatsapp(path: str | Path, progress_cb=None) -> dict:
     embeddings = embed_texts(texts)
 
     if progress_cb:
-        progress_cb("Storing in Qdrant…", 0.8)
+        progress_cb("Storing in Qdrant…", 0.75)
 
     qdrant_client = get_qdrant()
     stored = upsert_chunks(chunks, embeddings, qdrant_client)
+
+    if progress_cb:
+        progress_cb("Mirroring to Supermemory…", 0.9)
+
+    supermemory.add_chunks(chunks)
 
     if progress_cb:
         progress_cb("Done.", 1.0)
@@ -82,10 +88,15 @@ def ingest_pdf(path: str | Path, progress_cb=None) -> dict:
     embeddings = embed_texts(texts)
 
     if progress_cb:
-        progress_cb("Storing in Qdrant…", 0.8)
+        progress_cb("Storing in Qdrant…", 0.75)
 
     qdrant_client = get_qdrant()
     stored = upsert_chunks(chunks, embeddings, qdrant_client)
+
+    if progress_cb:
+        progress_cb("Mirroring to Supermemory…", 0.9)
+
+    supermemory.add_chunks(chunks)
 
     if progress_cb:
         progress_cb("Done.", 1.0)

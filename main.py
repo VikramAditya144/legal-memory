@@ -5,7 +5,6 @@ Run with:  streamlit run main.py
 """
 
 import os
-import sys
 import tempfile
 from pathlib import Path
 
@@ -27,8 +26,9 @@ st.set_page_config(
 try:
     from app.embeddings import embed_texts
     from app.ingest import ingest_pdf, ingest_whatsapp
-    from app.store import collection_stats, get_client as get_qdrant, search
+    from app.store import collection_stats, get_client as get_qdrant, search as qdrant_search
     from app.summarize import summarize_results_batch
+    import app.supermemory as supermemory
 except ImportError as e:
     st.error(f"Missing dependency: {e}. Run `pip install -r requirements.txt`")
     st.stop()
@@ -36,6 +36,8 @@ except ImportError as e:
 # ── Session state defaults ────────────────────────────────────────────────────
 if "last_results" not in st.session_state:
     st.session_state.last_results = []
+if "last_sm_results" not in st.session_state:
+    st.session_state.last_sm_results = []
 if "ingest_log" not in st.session_state:
     st.session_state.ingest_log = []
 if "last_query" not in st.session_state:
@@ -59,10 +61,17 @@ with st.sidebar:
     st.caption("AI-powered retrieval from your firm's documents")
 
     # Connection status
-    if check_qdrant():
-        st.success("Qdrant connected", icon="✅")
-    else:
-        st.error("Qdrant not reachable — run: `docker compose up -d`")
+    col_q, col_sm = st.columns(2)
+    with col_q:
+        if check_qdrant():
+            st.success("Qdrant ✅")
+        else:
+            st.error("Qdrant ✗")
+    with col_sm:
+        if supermemory.is_available():
+            st.success("Supermemory ✅")
+        else:
+            st.warning("Supermemory –")
 
     st.divider()
 
@@ -178,6 +187,7 @@ col_search, col_clear = st.columns([1, 5])
 search_btn = col_search.button("Search", type="primary")
 if col_clear.button("Clear"):
     st.session_state.last_results = []
+    st.session_state.last_sm_results = []
     st.rerun()
 
 # Example queries
@@ -195,23 +205,35 @@ if search_btn and query.strip():
     else:
         with st.spinner("Searching…"):
             try:
+                # Qdrant vector search
                 vec = embed_texts([query.strip()])[0]
-                results = search(vec, qdrant(), top_k=5)
-                # Claude summaries (non-blocking — falls back gracefully if key missing)
+                results = qdrant_search(vec, qdrant(), top_k=5)
                 summaries = summarize_results_batch(query.strip(), results)
                 for r, s in zip(results, summaries):
                     r["summary"] = s
                 st.session_state.last_results = results
                 st.session_state.last_query = query.strip()
+
+                # Supermemory search (parallel, non-blocking)
+                if supermemory.is_available():
+                    sm_results = supermemory.search(query.strip(), top_k=5)
+                    sm_summaries = summarize_results_batch(query.strip(), sm_results)
+                    for r, s in zip(sm_results, sm_summaries):
+                        r["summary"] = s
+                    st.session_state.last_sm_results = sm_results
+                else:
+                    st.session_state.last_sm_results = []
+
             except Exception as e:
                 st.error(f"Search failed: {e}")
 
 # ── Results ───────────────────────────────────────────────────────────────────
-if st.session_state.last_results:
-    st.divider()
-    st.subheader(f"Top {len(st.session_state.last_results)} results")
+def render_results(results: list[dict], engine_label: str):
+    if not results:
+        st.info(f"No results from {engine_label}.")
+        return
 
-    for i, r in enumerate(st.session_state.last_results, start=1):
+    for i, r in enumerate(results, start=1):
         source_icon = "💬" if r["source_type"] == "whatsapp" else "📄"
         score_pct = int(r["score"] * 100)
 
@@ -230,7 +252,6 @@ if st.session_state.last_results:
                 color = "green" if score_pct >= 70 else "orange" if score_pct >= 50 else "red"
                 st.markdown(f":{color}[{score_pct}% match]")
 
-            # Claude summary (if available) — otherwise raw excerpt
             summary = r.get("summary", "")
             if summary:
                 st.markdown(f"**{summary}**")
@@ -248,6 +269,27 @@ if st.session_state.last_results:
                 st.text(r["text"])
 
             st.divider()
+
+
+has_qdrant = bool(st.session_state.last_results)
+has_sm = bool(st.session_state.last_sm_results)
+
+if has_qdrant or has_sm:
+    st.divider()
+
+    if has_sm:
+        tab_qdrant, tab_sm = st.tabs(["Qdrant · Vector search", "Supermemory · Semantic search"])
+        with tab_qdrant:
+            st.caption("Cosine similarity on local fastembed multilingual embeddings")
+            render_results(st.session_state.last_results, "Qdrant")
+        with tab_sm:
+            st.caption("Cloud semantic search with query rewriting and reranking")
+            render_results(st.session_state.last_sm_results, "Supermemory")
+    else:
+        st.subheader(f"Top {len(st.session_state.last_results)} results")
+        if not supermemory.is_available():
+            st.caption("Add `SUPERMEMORY_API_KEY` to `.env` to also search via Supermemory")
+        render_results(st.session_state.last_results, "Qdrant")
 
 elif not search_btn:
     if stats["total_chunks"] == 0:
