@@ -33,6 +33,21 @@ Run `/sync-gbrain` to force-refresh, `/sync-gbrain --full` for full reindex.
 
 <!-- gstack-gbrain-search-guidance:end -->
 
+## Deploy Configuration (configured by /setup-deploy)
+- Platform: auto-deploy on push to main (platform TBD)
+- Production URL: TBD — update this once you have a production URL
+- Deploy workflow: automatic on push/merge to main
+- Deploy status command: HTTP health check
+- Merge method: squash
+- Project type: web app
+- Post-deploy health check: {production-url} (update when URL is known)
+
+### Custom deploy hooks
+- Pre-merge: none
+- Deploy trigger: automatic on push to main
+- Deploy status: poll production URL until 200
+- Health check: production root URL (update when known)
+
 ## Skill routing
 
 When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
