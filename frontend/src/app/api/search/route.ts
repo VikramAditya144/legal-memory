@@ -10,9 +10,12 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const data = await res.json()
-    return NextResponse.json(data, { status: res.status })
+    if (!res.ok) {
+      const text = await res.text()
+      return NextResponse.json({ error: text || `Backend ${res.status}` }, { status: res.status })
+    }
+    return NextResponse.json(await res.json())
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return NextResponse.json({ error: String(e) }, { status: 502 })
   }
 }
