@@ -143,16 +143,18 @@ def collection_stats() -> dict:
                     page=page,
                     include_content=False,
                 )
-                docs = getattr(resp, "documents", []) or []
-                if not docs:
+                memories = getattr(resp, "memories", []) or []
+                if not memories:
                     break
-                for doc in docs:
+                for mem in memories:
                     total += 1
-                    meta = getattr(doc, "metadata", {}) or {}
+                    meta = getattr(mem, "metadata", {}) or {}
                     name = meta.get("source_name", "")
                     if name:
                         bucket.add(name)
-                if len(docs) < 100:
+                pagination = getattr(resp, "pagination", None)
+                total_pages = int(getattr(pagination, "total_pages", 1) or 1)
+                if page >= total_pages:
                     break
                 page += 1
         except Exception:
